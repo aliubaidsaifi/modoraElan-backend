@@ -1,25 +1,19 @@
-import nodemailer from "nodemailer";
-
-let transporter = null;
-function getTransporter() {
-  if (transporter) return transporter;
-  const host = process.env.SMTP_HOST, user = process.env.SMTP_USER, pass = process.env.SMTP_PASS;
-  if (!host || !user || !pass) return null;
-  transporter = nodemailer.createTransport({
-    host,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: false, // 587 = STARTTLS
-    auth: { user, pass },
-  });
-  return transporter;
-}
-
 export async function sendEmail(to, subject, html) {
-  const t = getTransporter();
-  if (!t) {
+  const key = process.env.BREVO_API_KEY;
+  if (!key) {
     console.log(`\n📧 [DEV EMAIL] To: ${to} | ${subject}\n${html.replace(/<[^>]+>/g, " ").trim()}\n`);
     return { dev: true };
   }
-  await t.sendMail({ from: process.env.EMAIL_FROM || `Modora Élan <${process.env.SMTP_USER}>`, to, subject, html });
-  return { sent: true };
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": key, "Content-Type": "application/json", accept: "application/json" },
+    body: JSON.stringify({
+      sender: { name: "Modora Élan", email: process.env.EMAIL_FROM_ADDR || "aliubaidsaifi@gmail.com" },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
+  });
+  if (!res.ok) throw new Error("Email failed: " + (await res.text()));
+  return res.json();
 }
