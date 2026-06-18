@@ -1,14 +1,25 @@
+import nodemailer from "nodemailer";
+
+let transporter = null;
+function getTransporter() {
+  if (transporter) return transporter;
+  const host = process.env.SMTP_HOST, user = process.env.SMTP_USER, pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) return null;
+  transporter = nodemailer.createTransport({
+    host,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: false, // 587 = STARTTLS
+    auth: { user, pass },
+  });
+  return transporter;
+}
+
 export async function sendEmail(to, subject, html) {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) {
+  const t = getTransporter();
+  if (!t) {
     console.log(`\n📧 [DEV EMAIL] To: ${to} | ${subject}\n${html.replace(/<[^>]+>/g, " ").trim()}\n`);
     return { dev: true };
   }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM || "Modora Élan <onboarding@resend.dev>", to, subject, html }),
-  });
-  if (!res.ok) throw new Error("Email send failed: " + (await res.text()));
-  return res.json();
+  await t.sendMail({ from: process.env.EMAIL_FROM || `Modora Élan <${process.env.SMTP_USER}>`, to, subject, html });
+  return { sent: true };
 }
